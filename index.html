@@ -159,13 +159,17 @@ const NAMES={};Object.keys(NM).forEach(k=>NAMES[NM[k]]=k);
 function norm(m){m=String(m||"").trim();const u=m.toUpperCase();const n=Object.keys(NM).find(k=>u.startsWith(k));if(n)return NM[n];
 const x=m.replace(/\s*with.*$/i,"").match(/\d+(?:\.\d+)*(\s*D)?/);if(!x)return"";let t=x[0].replace(/\s*D$/,"");const a=t.split(".");return(x[1]?a.concat(a):a).join(".")}
 const PL='<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>',PS='<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg>';
-let au=null,aw=null;const AM=new Map(),AI=[];const akey=a=>{if(!/^data:/.test(a))return a;if(!AM.has(a)){AM.set(a,"d"+AI.length);AI.push(a)}return AM.get(a)},asrc=k=>/^d\d+$/.test(k)?AI[+k.slice(1)]:"/_blob/"+k;
+let au=null,aw=null;const AM=new Map(),AI=[];// Tune audio: a data: URL kept in a table, or a file in the website's audio folder. Opened from the front laptop
+// (Presenter Mode), the files are fetched from the hymn book's own address.
+const ABASE=window.SOTERIO_OBS?"https://barringtongospelhall.github.io/soterio/":"";
+const akey=a=>{if(!/^data:/.test(a))return a;if(!AM.has(a)){AM.set(a,"d"+AI.length);AI.push(a)}return AM.get(a)},asrc=k=>/^d\d+$/.test(k)?AI[+k.slice(1)]:/^audio\//.test(k)?ABASE+k:"/_blob/"+k;
 function stopA(){if(au){au.pause();au.currentTime=0}if(aw){const b=aw.querySelector(".pb");if(b)b.innerHTML=PL}aw=null}
-function tog(w){const id=w.dataset.au;if(aw&&aw!==w)stopA();
+function tog(w){const id=w.dataset.au;if(!id){toast("There is no tune audio for this hymn yet");return}if(aw&&aw!==w)stopA();
 if(!au||au.dataset.id!==id){au=new Audio(asrc(id));au.dataset.id=id;au.onended=()=>{if(aw){aw.querySelector(".pb").innerHTML=PL}}}
 aw=w;const b=w.querySelector(".pb");
-if(au.paused){au.play().catch(()=>{b.innerHTML=PL;alert("This tune could not be played.")});b.innerHTML=PS}else{au.pause();b.innerHTML=PL}}
-function sheets(imgs,audio,title,crop){return(imgs||[]).map(s=>`<div class="tw${audio?" has":""}${crop?" crop":""}"${audio?` data-au="${akey(audio)}" role="button" aria-label="Tune sheet for ${esc(title)}. Tap to show the play button"`:""}><img class="tune" src="${/^data:/.test(s)?s:"/_blob/"+s}" alt="Tune for ${esc(title)}">${audio?`<div class="tov"><button class="pb" aria-label="Play tune">${PL}</button></div>`:""}</div>`).join("")}
+if(au.paused){au.play().catch(()=>{b.innerHTML=PL;toast("This tune couldn\u2019t be played. Check the internet connection.")});b.innerHTML=PS}else{au.pause();b.innerHTML=PL}}
+// Every tune sheet shows a play button when tapped; without audio, the button says there isn't any yet
+function sheets(imgs,audio,title,crop){return(imgs||[]).map(s=>`<div class="tw has${crop?" crop":""}"${audio?` data-au="${akey(audio)}"`:""} role="button" aria-label="Tune sheet for ${esc(title)}. Tap to show the play button"><img class="tune" src="${/^data:/.test(s)?s:"/_blob/"+s}" alt="Tune for ${esc(title)}"><div class="tov"><button class="pb" aria-label="Play tune">${PL}</button></div></div>`).join("")}
 const hay=h=>[h.number,h.title,h.first,h.author,h.meter,h.tune,h.psalm?"psalm "+h.psalm:"",h.lyrics,(h.alts||[]).map(a=>(a.tune||"")+" "+(a.lyrics||"")).join(" ")].join(" ").toLowerCase();
 function versions(h){return[{tune:h.tune,meter:h.meter,lyrics:h.lyrics,sheets:h.sheets||[],audio:h.audio||"",highNote:!!h.highNote}].concat((h.alts||[]).map(a=>({tune:a.tune,meter:a.noMeter?"":(a.meter||h.meter),lyrics:a.lyrics||h.lyrics,sheets:a.sheets||[],audio:a.audio||"",highNote:!!a.highNote})))}
 function cur(h){const v=versions(h),i=ver&&ver.id===h.id?ver.i:0;return v[i]||v[0]}
