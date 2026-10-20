@@ -94,6 +94,11 @@ body.pm .verse.pblk{font-size:calc(17px*var(--fs,1))!important;line-height:1.35}
 .verse.pblk{margin:0 0 8px;padding:12px 14px;border:1.5px solid transparent;border-radius:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .2s,border-color .2s}
 .verse.pblk.ch{font-style:italic;padding-left:52px}.verse.pblk.solo{padding-left:14px}
 .verse.pblk:active{opacity:.7}.verse.pblk.live{border-color:var(--accent);background:var(--acs)}
+body.pm main{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}body.pm .auth{display:none}body.pm .tw{width:min(100%,400px)}body.pm .tname{margin-top:4px}body.pm .verse.pblk{padding:9px 12px}body.pm .verse.pblk.ch{padding-left:50px}body.pm .verse.pblk.solo{padding-left:12px}body.pm .pvs{margin-bottom:10px}body.pm .pst{margin-bottom:6px}body.pm .top2{padding-top:10px}body.pm #toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+.pnav{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));z-index:30;display:flex;gap:10px;padding:8px 16px;background:var(--bg);border-top:1px solid var(--line)}
+.pnav button{height:46px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;padding:0}
+.pnav .pbk{width:58px;flex:none}.pnav .pnx{flex:1;background:var(--accent);border-color:var(--accent);color:#fff;font:600 17px Arimo,sans-serif}
+.pnav button:disabled{opacity:.45;cursor:default}.pnav button:active:not(:disabled){transform:scale(.98)}
 .pmset{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}.pmset p{margin:0;font-size:14px;line-height:1.45;width:100%}
 .pmset input{flex:1;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:16px Arimo,sans-serif}
 </style>
@@ -161,7 +166,7 @@ return `<div class="bkrow"><button class="btn bk" data-a="open" data-id="${h.id}
    It only works when the hymn book is opened from the front laptop (http://<laptop>:8650/hymns), where the
    plug-in's loader sets window.SOTERIO_OBS. The plug-in shows the verse on its OBS browser source (/hymn-screen). */
 const OBS=!!window.SOTERIO_OBS;
-let pm=false,live=null,pconn=false,pes=null,pretry=null,pask=false,pnote="";const pvm={};
+let pm=false,live=null,pconn=false,pes=null,pretry=null,pask=false,pnote="",pused=false,phs=null;const pvm={};
 try{pm=OBS&&localStorage.getItem("pm")==="1"}catch(e){}
 const pmOn=()=>OBS&&pm,ptok=()=>{try{return localStorage.getItem("bghFrontToken")||""}catch(e){return""}};
 const pIsC=b=>/^(refrain|chorus)/i.test(b),pStrip=b=>b.replace(/^(refrain|chorus):?\s*/i,"").trim();
@@ -178,7 +183,14 @@ if(r.status===401){punpair();return{ok:false}}let j={ok:false};try{j=await r.jso
 function punpair(){try{localStorage.removeItem("bghFrontToken")}catch(e){}if(pes){pes.close();pes=null}pconn=false;pnote="This phone isn't paired with the front laptop any more.";prender()}
 function pshow(h,i,k){const it=pres(h)[i];if(!it)return;const ch=k==="c"||it.c,text=k==="c"?it.chorus:it.text;if(!text)return;
 const show={key:h.id+":"+i+":"+k,id:h.id,i,k,num:pageNum(h),title:pageTitle(h),label:ch?"Chorus":"Verse "+it.label,chorus:ch,text:pCaps(text)};
-live=show;pvm[h.id]=i;render();pcmd("hymn",{show})}
+live=show;pvm[h.id]=i;pused=true;render();pcmd("hymn",{show})}
+// Done with the hymn: clear the screen, and the plug-in switches OBS back to the scene from before it
+function pback(){pused=false;live=null;pcmd("hymnback",{})}
+// Verse 1, chorus, verse 2, chorus…: the order Next and Back step through
+function pseq(P){const q=[];P.forEach((it,i)=>{q.push([i,"v"]);if(it.chorus)q.push([i,"c"])});return q}
+function pnext(h,d){const P=pres(h),q=pseq(P),lk=live&&live.id===h.id?live:null,vi=pvm[h.id]||0;const at=lk?q.findIndex(x=>x[0]===lk.i&&x[1]===lk.k):q.findIndex(x=>x[0]===vi)-(d>0?1:0);return q[at+d]||null}
+function pstep(h,d){const n=pnext(h,d);if(!n){toast(d>0?"That’s the end of the hymn":"That’s the start of the hymn");return}pvm[h.id]=n[0];pshow(h,n[0],n[1])}
+const pname=(P,n)=>!n?"":n[1]==="c"||P[n[0]].c?"Chorus":"Verse "+P[n[0]].label;
 function pclear(){if(!live)return;live=null;if(state.v==="view")render();pcmd("hymn",{})}
 function prender(){if((state.v==="view"||state.v==="settings")&&!(document.activeElement&&document.activeElement.tagName==="INPUT"))render()}
 function pconnect(){clearTimeout(pretry);if(pes){pes.close();pes=null}if(!pmOn()||!ptok())return;
@@ -186,6 +198,7 @@ pes=new EventSource("/api/events?t="+encodeURIComponent(ptok())+"&mode=hymns");
 pes.onopen=()=>{if(!pconn){pconn=true;pnote="";prender()}};
 pes.addEventListener("hymn",e=>{let d=null;try{d=JSON.parse(e.data)}catch(x){}const n=d&&d.key&&HYMNS.some(x=>x.id===d.id)?d:null;pconn=true;if((n&&n.key)!==(live&&live.key)){live=n;if(n)pvm[n.id]=n.i;prender()}});
 pes.addEventListener("unpaired",punpair);
+pes.addEventListener("state",e=>{let d=null;try{d=JSON.parse(e.data)}catch(x){}const v=d&&typeof d.hymnScene==="boolean"?d.hymnScene:null;if(v!==phs){phs=v;if(state.v==="settings")prender()}});
 pes.onerror=async()=>{if(pes&&pes.readyState!==2){if(pconn){pconn=false;prender()}return}pconn=false;prender();
 try{const r=await fetch("/api/cmd",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+ptok()},body:'{"cmd":"ping"}'});if(r.status===401)return punpair()}catch(x){}pretry=setTimeout(pconnect,3000)}}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&pmOn()&&(!pes||pes.readyState===2))pconnect()});
@@ -195,16 +208,17 @@ const st=!ptok()?"Not paired":!pconn?"Connecting to OBS…":!live?"Screen is cle
 return `<div class="pst"><span class="pdot${pconn&&ptok()?" ok":""}"></span><span>${esc(st)}</span>${live?`<button class="pclr" data-a="pmx">Clear screen</button>`:""}</div>
 <div class="pvs" role="group" aria-label="Verses">${P.map((x,j)=>`<button class="pv${j===i?" on":""}${lk&&lk.i===j?" lv":""}" data-a="pmv" data-i="${j}" aria-label="${x.c?"Chorus":"Verse "+x.label}">${esc(x.label)}</button>`).join("")}</div>
 <div class="verse pblk${it.c?" ch solo":""}${on("v")}" data-a="pms" role="button" aria-label="Show ${it.c?"the chorus":"verse "+it.label} on the screen">${it.c?"":`<span class="vn">${esc(it.label)}</span>`}<span>${esc(it.text)}</span></div>
-${it.chorus?`<div class="verse pblk ch${on("c")}" data-a="pmc" role="button" aria-label="Show the chorus on the screen"><span>${esc(it.chorus)}</span></div>`:""}`}
+${it.chorus?`<div class="verse pblk ch${on("c")}" data-a="pmc" role="button" aria-label="Show the chorus on the screen"><span>${esc(it.chorus)}</span></div>`:""}
+<div class="pnav"><button class="pbk" data-a="pmp" aria-label="Back: ${esc(pname(P,pnext(h,-1))||"start of the hymn")}"${pnext(h,-1)?"":" disabled"}><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="pnx" data-a="pmn"${pnext(h,1)?"":" disabled"}><span>${pnext(h,1)?(lk?"Next":"Show")+" · "+esc(pname(P,pnext(h,1))):"End of hymn"}</span><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`}
 function pmSettings(){if(!OBS)return `<div class="sl">Presenter Mode</div><div class="sg"><button class="btn${pask?" on":""}" data-a="pmask">${pask?"Hide":"Set up"}</button></div><div class="hint" style="margin-top:8px">Show hymn verses on the projector through OBS, using this phone as the controller.</div>${pask?`<div class="pmset"><p>Presenter Mode works on the church Wi-Fi, through the BGH LIVE Front plug-in in OBS. Open the hymn book from the front laptop’s address, shown in the BGH LIVE Front panel:</p><input id="pmaddr" inputmode="url" autocomplete="off" placeholder="192.168.1.20" value="${esc((()=>{try{return localStorage.getItem("pmaddr")||""}catch(e){return""}})())}"><button class="btn" data-a="pmopen">Open</button></div>`:""}`;
-const t=ptok();return `<div class="sl">Presenter Mode</div><div class="sg"><button class="btn${pm?" on":""}" data-a="pm" aria-pressed="${pm}">${pm?"On":"Off"}</button></div><div class="hint" style="margin-top:8px">${!pm?"Show hymn verses on the projector through OBS, using this phone as the controller.":!t?`${esc(pnote||"This phone isn't paired with the front laptop yet.")} <button class="lk" data-a="pmpair">Pair this phone</button>`:pconn?"Connected to OBS. Open a hymn and tap a verse to show it on the screen.":"Connecting to OBS… Check this phone is on the church Wi-Fi and OBS is open."}</div>`}
+const t=ptok();return `<div class="sl">Presenter Mode</div><div class="sg"><button class="btn${pm?" on":""}" data-a="pm" aria-pressed="${pm}">${pm?"On":"Off"}</button></div><div class="hint" style="margin-top:8px">${!pm?"Show hymn verses on the projector through OBS, using this phone as the controller.":!t?`${esc(pnote||"This phone isn't paired with the front laptop yet.")} <button class="lk" data-a="pmpair">Pair this phone</button>`:pconn?"Connected to OBS. Open a hymn and tap a verse to show it on the screen."+(phs===false?" OBS has no scene called Hymns, so it won’t switch to the verses by itself.":""):"Connecting to OBS… Check this phone is on the church Wi-Fi and OBS is open."}</div>`}
 function pmBind(){document.querySelectorAll('[data-a^="pm"]').forEach(el=>el.onclick=e=>{e.stopPropagation();const a=el.dataset.a,h=HYMNS.find(x=>x.id===state.id);
-if(a==="pmv"&&h){pvm[h.id]=+el.dataset.i;pshow(h,+el.dataset.i,"v")}else if(a==="pms"&&h)pshow(h,pvm[h.id]||0,"v");else if(a==="pmc"&&h)pshow(h,pvm[h.id]||0,"c");else if(a==="pmx")pclear();
-else if(a==="pm"){if(pm)pclear();pm=!pm;try{localStorage.setItem("pm",pm?"1":"0")}catch(x){}if(pm)pconnect();else if(pes){pes.close();pes=null;pconn=false}render()}
+if(a==="pmv"&&h){pvm[h.id]=+el.dataset.i;pshow(h,+el.dataset.i,"v")}else if(a==="pms"&&h)pshow(h,pvm[h.id]||0,"v");else if(a==="pmc"&&h)pshow(h,pvm[h.id]||0,"c");else if(a==="pmx")pclear();else if(a==="pmn"&&h)pstep(h,1);else if(a==="pmp"&&h)pstep(h,-1);
+else if(a==="pm"){if(pm){if(pused)pback();else pclear()}pm=!pm;try{localStorage.setItem("pm",pm?"1":"0")}catch(x){}if(pm)pconnect();else if(pes){pes.close();pes=null;pconn=false}render()}
 else if(a==="pmpair")location.href="/?next=hymns";else if(a==="pmask"){pask=!pask;render()}
 else if(a==="pmopen"){let v=($("#pmaddr").value||"").trim().replace(/^https?:\/\//i,"").replace(/\/.*$/,"");if(!v){$("#pmaddr").focus();return}try{localStorage.setItem("pmaddr",v)}catch(x){}if(!/:\d+$/.test(v))v+=":8650";location.href="http://"+v+"/hymns"}})}
 if(pmOn())pconnect();
-function go(v,id=null,keep){stopA();if(!keep){alt=null;ver=null}if(pmOn()&&live&&(v==="list"||v==="starred"))pclear();state.v=v;state.id=id;render();window.scrollTo(0,0)}
+function go(v,id=null,keep){stopA();if(!keep){alt=null;ver=null}if(pmOn()&&(v==="list"||v==="starred")){if(pused)pback();else if(live)pclear()}state.v=v;state.id=id;render();window.scrollTo(0,0)}
 function render(){$("header").hidden=state.v!=="list";document.documentElement.style.setProperty("--hh",(state.v==="list"?$("header").offsetHeight:0)+"px");document.body.classList.toggle("nohd",state.v!=="list");if(state.v==="list")syncCol();$("#app").innerHTML=state.v==="view"?view():state.v==="meter"?meterScreen():state.v==="alts"?altScreen():state.v==="starred"?starredScreen():state.v==="settings"?settingsScreen():list();document.querySelectorAll("#ft button").forEach(b=>{const on=b.dataset.f===(state.v==="starred"?"starred":state.v==="settings"?"settings":"list");b.classList.toggle("on",on);b.setAttribute("aria-current",on?"page":"false")});bind()}
 const card=h=>`<div class="card" data-a="open" data-id="${h.id}"><div class="num">${esc(h.number)}</div><div style="min-width:0"><h3>${esc(isPs(h)?titleCase(h.first||h.title):h.title)}</h3>${isPs(h)?(h.tune?`<p class="tn">${esc(h.tune)}</p>`:""):(h.first?`<p>${esc(h.first)}</p>`:"")}</div></div>`;
 function list(){const q=state.q.toLowerCase().trim();
