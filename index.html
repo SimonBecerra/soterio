@@ -171,7 +171,7 @@ let tsnd="Piano",tspd=1;try{tsnd=localStorage.getItem("tsnd")==="Organ"?"Organ":
 const TSND={Piano:{base:"https://cdn.jsdelivr.net/gh/Tonejs/audio@efd8296360f9526e379bfbe5c1698ff54d6a1d34/salamander/",names:["C","Cs","D","Ds","E","F","Fs","G","Gs","A","As","B"],has:pc=>pc%3===0},
 Organ:{base:"https://cdn.jsdelivr.net/gh/gleitz/midi-js-soundfonts@044fab8e1456bfafc5776e86dfd6bb8697149aef/MusyngKite/church_organ-mp3/",names:["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"],has:()=>true}};
 const TI=[],TM=new Map(),TRAW=new Map(),TBUF=new Map(),tkey=a=>{if(!TM.has(a)){TM.set(a,"t"+TI.length);TI.push(a)}return TM.get(a)};
-let tctx=null,tsrc=null,tlib=null,tload=null;
+let tlib=null,tload=null;
 function tLib(){if(window.ABCJS)return Promise.resolve();if(tlib)return tlib;tlib=new Promise((res,rej)=>{const x=document.createElement("script");x.src="https://cdn.jsdelivr.net/npm/abcjs@6.4.4/dist/abcjs-basic-min.js";x.onload=res;x.onerror=()=>{tlib=null;x.remove();rej(new Error("lib"))};document.head.appendChild(x)});return tlib}
 function tNear(kind,p){const k=TSND[kind];p=Math.max(21,Math.min(108,p));if(k.has(p%12))return p;for(let d=1;d<12;d++){if(p-d>=21&&k.has((p-d)%12))return p-d;if(p+d<=108&&k.has((p+d)%12))return p+d}return p}
 async function tSamples(ctx,kind,pitches){const need=[...new Set(pitches.map(p=>tNear(kind,p)))],dec={};
@@ -202,21 +202,33 @@ if(organ){g.gain.linearRampToValueAtTime(n.v*.4,t0+.035);g.gain.setValueAtTime(n
 else{g.gain.linearRampToValueAtTime(n.v*.4,t0+.006);g.gain.setTargetAtTime(n.v*.12,t0+.01,.4);g.gain.setTargetAtTime(0,t0+dur,.09);os.start(t0);os.stop(t0+dur+.7)}os.connect(g);g.connect(bus)})}
 const buf=await ctx.startRendering(),d=buf.getChannelData(0);let pk=0;for(let i=0;i<d.length;i++){const x=Math.abs(d[i]);if(x>pk)pk=x}
 if(pk>0){const k=.89/pk;for(let i=0;i<d.length;i++)d[i]*=k}buf._simple=!rec;if(!rec)TBUF.delete(kind+"|"+rate+"|"+abc);return buf}
-function stopA(){if(au){au.pause();au.currentTime=0}if(tsrc){const x=tsrc;tsrc=null;try{x.stop()}catch(e){}}tload=null;if(aw){const b=aw.querySelector(".pb");if(b)b.innerHTML=PL}aw=null}
-function tMp3(w,id,b){if(!au||au.dataset.id!==id){if(au)au.pause();au=new Audio(asrc(id));au.dataset.id=id;au.onended=()=>{if(aw){aw.querySelector(".pb").innerHTML=PL}}}
-aw=w;if(au.paused){au.playbackRate=tspd;au.play().catch(()=>{b.innerHTML=PL;toast("This tune couldn\u2019t be played. Check the internet connection.")});b.innerHTML=PS}else{au.pause();b.innerHTML=PL}}
+// Everything plays through one audio element, never the Web Audio speaker: on iPhone, Web Audio goes quiet with the
+// silent switch on, but an audio element plays like music does. A written tune is drawn into a WAV file first.
+try{if(navigator.audioSession)navigator.audioSession.type="playback"}catch(e){}
+const TWAV=new Map(),SILENT="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+function tWav(buf){const d=buf.getChannelData(0),n=d.length,ab=new ArrayBuffer(44+n*2),v=new DataView(ab),w=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i))};
+w(0,"RIFF");v.setUint32(4,36+n*2,true);w(8,"WAVE");w(12,"fmt ");v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,buf.sampleRate,true);v.setUint32(28,buf.sampleRate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,"data");v.setUint32(40,n*2,true);
+for(let i=0;i<n;i++){const x=Math.max(-1,Math.min(1,d[i]));v.setInt16(44+i*2,x<0?x*32768:x*32767,true)}return URL.createObjectURL(new Blob([ab],{type:"audio/wav"}))}
+function tEl(){if(!au){au=new Audio();au.preload="auto";au.onended=()=>{if(aw){const b=aw.querySelector(".pb");if(b)b.innerHTML=PL}aw=null}}return au}
+function stopA(){if(au){au.pause();try{au.currentTime=0}catch(e){}}tload=null;if(aw){const b=aw.querySelector(".pb");if(b)b.innerHTML=PL}aw=null}
+function tStart(w,key,url,rate,b){const a=tEl();if(a.dataset.id!==key){a.src=url;a.dataset.id=key}aw=w;a.playbackRate=rate;a.defaultPlaybackRate=rate;b.innerHTML=PS;
+a.play().catch(()=>{if(aw===w){b.innerHTML=PL;aw=null}toast("This tune couldn’t be played. Check the internet connection.")})}
+function tMp3(w,id,b){tStart(w,id,asrc(id),tspd,b)}
 function tog(w){const id=w.dataset.au,tb=w.dataset.abc,b=w.querySelector(".pb");if(!id&&!tb){toast("There is no tune audio for this hymn yet");return}if(aw&&aw!==w)stopA();
-if(!tb)return tMp3(w,id,b);
-// The written tune: tap again to pause and to carry on
-if(aw===w&&tsrc){if(tctx.state==="running"){tctx.suspend();b.innerHTML=PL}else{tctx.resume();b.innerHTML=PS}return}
+const abc=tb?TI[+tb.slice(1)]:"",key=tb?"t|"+tsnd+"|"+tspd+"|"+tb:id;
+// Same tune again: pause, or carry on
+if(aw===w&&au&&au.dataset.id===key){if(au.paused){au.play().catch(()=>{});b.innerHTML=PS}else{au.pause();b.innerHTML=PL}return}
 if(aw===w&&tload)return;
-try{tctx=tctx||new(window.AudioContext||window.webkitAudioContext)();tctx.resume()}catch(e){}
-aw=w;b.innerHTML=PS;const job=tload={};const slow=setTimeout(()=>{if(tload===job)toast("Getting the tune ready\u2026")},700);
-tRender(TI[+tb.slice(1)],tsnd,tspd).then(buf=>{clearTimeout(slow);if(tload!==job)return;tload=null;
+if(!tb)return tMp3(w,id,b);
+if(TWAV.has(key))return tStart(w,key,TWAV.get(key),1,b);
+// Still inside the tap: start the audio element on a moment of silence, so it may play once the tune is ready
+const a=tEl();a.src=SILENT;a.dataset.id="";a.play().catch(()=>{});
+aw=w;b.innerHTML=PS;const job=tload={};const slow=setTimeout(()=>{if(tload===job)toast("Getting the tune ready…")},700);
+tRender(abc,tsnd,tspd).then(buf=>{clearTimeout(slow);if(tload!==job)return;tload=null;
 if(buf._simple&&id)return tMp3(w,id,b);
-if(buf._simple)toast("The recorded "+tsnd.toLowerCase()+" couldn\u2019t load, so a simple tone is used. It needs internet.");
-tctx.resume();const s=tctx.createBufferSource();s.buffer=buf;s.connect(tctx.destination);s.onended=()=>{if(tsrc===s){tsrc=null;if(aw===w){b.innerHTML=PL;aw=null}}};s.start();tsrc=s})
-.catch(()=>{clearTimeout(slow);if(tload!==job)return;tload=null;if(id)return tMp3(w,id,b);b.innerHTML=PL;aw=null;toast("This tune couldn\u2019t be played. Check the internet connection.")})}
+if(buf._simple)toast("The recorded "+tsnd.toLowerCase()+" couldn’t load, so a simple tone is used. It needs internet.");
+const url=tWav(buf);if(!buf._simple)TWAV.set(key,url);tStart(w,key,url,1,b)})
+.catch(()=>{clearTimeout(slow);if(tload!==job)return;tload=null;if(id)return tMp3(w,id,b);b.innerHTML=PL;aw=null;toast("This tune couldn’t be played. Check the internet connection.")})}
 // Every tune sheet shows a play button when tapped; without audio, the button says there isn't any yet
 function sheets(imgs,audio,title,crop,abc){return(imgs||[]).map(s=>`<div class="tw has${crop?" crop":""}"${audio?` data-au="${akey(audio)}"`:""}${abc?` data-abc="${tkey(abc)}"`:""} role="button" aria-label="Tune sheet for ${esc(title)}. Tap to show the play button"><img class="tune" src="${/^data:/.test(s)?s:"/_blob/"+s}" alt="Tune for ${esc(title)}"><div class="tov"><button class="pb" aria-label="Play tune">${PL}</button></div></div>`).join("")}
 const hay=h=>[h.number,h.title,h.first,h.author,h.meter,h.tune,h.psalm?"psalm "+h.psalm:"",h.lyrics,(h.alts||[]).map(a=>(a.tune||"")+" "+(a.lyrics||"")).join(" ")].join(" ").toLowerCase();
