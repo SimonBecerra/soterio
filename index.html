@@ -361,11 +361,15 @@ ${tuneBlock(h)}
 <hr>${pmOn()?pbody(h):body}
 ${!pmOn()&&c.meter&&hasOthers(h,c)?`<hr class="fh"><div class="mfoot"><span class="mt" data-a="meter" data-id="${h.id}" role="button" title="See tunes with this meter"><b>${esc(c.meter)}</b></span></div>`:""}
 </article>`}
+// The search results under the hymn search stop above the phone's keyboard, so the last one can be scrolled to
+function fitSr(){const sr=$("#sr");if(!sr||sr.hidden)return;const v=window.visualViewport,bottom=v?v.offsetTop+v.height:innerHeight,top=sr.getBoundingClientRect().top;
+sr.style.maxHeight=Math.max(120,Math.min(innerHeight*.6,bottom-top-12))+"px"}
+if(window.visualViewport){visualViewport.addEventListener("resize",fitSr);visualViewport.addEventListener("scroll",fitSr)}
 function bind(){
 document.querySelectorAll(".sx").forEach(b=>{b.onpointerdown=e=>e.preventDefault();b.onclick=()=>{const i=b.parentElement.querySelector("input");i.value="";i.blur();if(i.id==="q"){state.q="";render()}else{const r=$("#sr");if(r)r.hidden=true}}});
 const hq=$("#hq");if(hq){const sr=$("#sr");hq.oninput=()=>{const t=hq.value.toLowerCase().trim();if(!t){sr.hidden=true;return}
 const r=HYMNS.filter(h=>(h.collection||"hymn")===cn&&hay(h).includes(t)).sort(cmp()).slice(0,8);
-sr.innerHTML=r.length?r.map(h=>`<button data-id="${h.id}"><b>${esc(h.number)}</b><span>${esc(isPs(h)?(h.title||titleCase(h.first||"")):h.title)}</span></button>`).join(""):`<i>No hymns found.</i>`;sr.hidden=false;
+sr.innerHTML=r.length?r.map(h=>`<button data-id="${h.id}"><b>${esc(h.number)}</b><span>${esc(isPs(h)?(h.title||titleCase(h.first||"")):h.title)}</span></button>`).join(""):`<i>No hymns found.</i>`;sr.hidden=false;fitSr();setTimeout(fitSr,350);
 sr.querySelectorAll("button").forEach(b=>b.onclick=()=>openHymn(b.dataset.id))}}
 const q=$("#q");if(q)q.oninput=e=>{state.q=e.target.value;const p=e.target.selectionStart;render();const n=$("#q");n.focus();try{n.setSelectionRange(p,p)}catch(x){}};
 document.querySelectorAll("[data-a]").forEach(el=>el.onclick=()=>{const a=el.dataset.a;
