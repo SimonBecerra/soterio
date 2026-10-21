@@ -240,6 +240,10 @@ const url=tWav(buf);if(!buf._simple)TWAV.set(key,url);tStart(w,key,url,1,b)})
 function sheets(imgs,audio,title,crop,abc){return(imgs||[]).map(s=>`<div class="tw has${crop?" crop":""}"${audio?` data-au="${akey(audio)}"`:""}${abc?` data-abc="${tkey(abc)}"`:""} role="button" aria-label="Tune sheet for ${esc(title)}. Tap to show the play button"><img class="tune" src="${/^data:/.test(s)?s:"/_blob/"+s}" alt="Tune for ${esc(title)}"><div class="tov"><button class="pb" aria-label="Play tune">${PL}</button></div></div>`).join("")}
 // Search ignores punctuation, accents and line breaks, in the words searched and the words typed
 const sq=t=>String(t||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/['\u2018\u2019\u02bc`]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+// Search results: a hymn number typed exactly, then titles that start with the words, titles with them, first
+// lines with them, and then the words anywhere in the hymn; in the usual order within each group
+const srank=(h,q)=>{const t=" "+sq(h.title)+" ";if(sq(h.number)===q||sq(h.psalm)===q)return 0;if(t.startsWith(" "+q))return 1;if(t.includes(q))return 2;if(sq(h.first).includes(q))return 3;return 4};
+const bySearch=(r,q)=>{if(!q)return r;const c=cmp(),k=new Map(r.map(h=>[h,srank(h,q)]));return r.slice().sort((a,b)=>k.get(a)-k.get(b)||c(a,b))};
 const HAY=new Map(),hay=h=>{let v=HAY.get(h);if(v==null){v=" "+sq([h.number,h.title,h.first,h.author,h.meter,h.tune,h.psalm?"psalm "+h.psalm:"",h.lyrics,(h.alts||[]).map(a=>(a.tune||"")+" "+(a.lyrics||"")).join(" ")].join(" "))+" ";HAY.set(h,v)}return v};
 function versions(h){return[{tune:h.tune,meter:h.meter,lyrics:h.lyrics,sheets:h.sheets||[],audio:h.audio||"",abc:h.abc||"",note:h.note||"",highNote:!!h.highNote}].concat((h.alts||[]).map(a=>({tune:a.tune,meter:a.noMeter?"":(a.meter||h.meter),lyrics:a.lyrics||h.lyrics,sheets:a.sheets||[],audio:a.audio||"",abc:a.abc||"",note:a.note||"",highNote:!!a.highNote})))}
 function cur(h){const v=versions(h),i=vi(h);return v[i]||v[0]}
@@ -344,7 +348,7 @@ ${ctab==="by"?`<div class="sw wsw"><input class="search" id="wq" type="search" p
 <div class="catl">${wf.length?wf.map(w=>`<button class="catr wr${on("by",w)}" type="button" data-a="catpick" data-k="by" data-c="${esc(w)}"><span>${esc(w)}</span><b>${W[w]}</b></button>`).join(""):`<div class="empty">No writers match “${esc(wq)}”.</div>`}</div>`
 :`<div class="catl">${CATS.map(c=>`<button class="catr${on("cat",c)}" type="button" data-a="catpick" data-k="cat" data-c="${esc(c)}"><span>${esc(c)}</span><b>${pool.filter(h=>inCat(h,c)).length}</b></button>`).join("")}</div>`}`}
 function list(){const q=sq(state.q),f=hasCats()?cat:null,c=f&&f.v;
-const pool=HYMNS.filter(h=>(h.collection||"hymn")===cn&&(!f||inFilt(h,f))),r=pool.filter(h=>!q||hay(h).includes(q)).sort(cmp());
+const pool=HYMNS.filter(h=>(h.collection||"hymn")===cn&&(!f||inFilt(h,f))),r=bySearch(pool.filter(h=>!q||hay(h).includes(q)).sort(cmp()),q);
 return `<div class="bar"><div class="sw${state.q?" has":""}"><input class="search" id="q" type="search" placeholder="${c?"Search "+esc(c)+"...":ph()}" aria-label="${c?"Search "+esc(c):ph().replace("...","")}" autocomplete="off" value="${esc(state.q)}"><button class="sx" type="button" aria-label="Clear search">×</button></div>${hasCats()?`<button class="btn bk cbtn${c?" on":""}" type="button" data-a="catopen" aria-label="Categories and random hymn">${MENU}</button>`:""}</div>`+
 (c?`<div class="catbar"><button class="catn" type="button" data-a="catopen">${f.k==="by"?`<small>Written by</small>`:""}${esc(c)}</button><span>${pool.length} ${pool.length===1?"hymn":"hymns"}</span><button class="catx" type="button" data-a="catx" aria-label="Show all hymns">×</button></div>`:"")+
 (r.length?r.map(card).join(""):`<div class="empty">${pool.length?"No hymns match your search.":EMPTY[cn]}</div>`)}
@@ -374,7 +378,7 @@ if(window.visualViewport){visualViewport.addEventListener("resize",fitSr);visual
 function bind(){
 document.querySelectorAll(".sx").forEach(b=>{b.onpointerdown=e=>e.preventDefault();b.onclick=()=>{const i=b.parentElement.querySelector("input");i.value="";i.blur();if(i.id==="q"){state.q="";render()}else{const r=$("#sr");if(r)r.hidden=true}}});
 const hq=$("#hq");if(hq){const sr=$("#sr");hq.oninput=()=>{const t=sq(hq.value);if(!t){sr.hidden=true;return}
-const r=HYMNS.filter(h=>(h.collection||"hymn")===cn&&hay(h).includes(t)).sort(cmp()).slice(0,8);
+const r=bySearch(HYMNS.filter(h=>(h.collection||"hymn")===cn&&hay(h).includes(t)),t).slice(0,8);
 sr.innerHTML=r.length?r.map(h=>`<button data-id="${h.id}"><b>${esc(h.number)}</b><span>${esc(isPs(h)?(h.title||titleCase(h.first||"")):h.title)}</span></button>`).join(""):`<i>No hymns found.</i>`;sr.hidden=false;fitSr();setTimeout(fitSr,350);
 sr.querySelectorAll("button").forEach(b=>b.onclick=()=>openHymn(b.dataset.id))}}
 const q=$("#q");if(q)q.oninput=e=>{state.q=e.target.value;const p=e.target.selectionStart;render();const n=$("#q");n.focus();try{n.setSelectionRange(p,p)}catch(x){}};
