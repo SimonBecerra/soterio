@@ -137,7 +137,10 @@ function syncCol(){$("#ttl").textContent=COL[cn];document.title=COL[cn];document
 try{starters=localStorage.getItem("starters")==="1"}catch(e){}
 const HI='<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4l7 9h-4.5v7h-5v-7H5z" fill="currentColor"/></svg>';
 const hiBadge=h=>starters&&cur(h).highNote?`<div class="hn" role="note">${HI}<span>High note · start lower</span></div>`:"";
-const SC={list:0,starred:0};function openHymn(id){if(state.v==="list"||state.v==="starred"){backTo=state.v;SC[state.v]=window.scrollY}{const hh=HYMNS.find(x=>x.id===id);if(hh)cn=hh.collection||"hymn"}if(!tabs.includes(id)){tabs.push(id);if(tabs.length>2){const k=tabs.find(x=>x!==state.id&&x!==id);tabs=tabs.filter(x=>x!==k)}}go("view",id)}
+const SC={list:0,starred:0};function openHymn(id){const fromList=state.v==="list"||state.v==="starred";if(fromList){backTo=state.v;SC[state.v]=window.scrollY}{const hh=HYMNS.find(x=>x.id===id);if(hh)cn=hh.collection||"hymn"}if(!tabs.includes(id)){tabs.push(id);if(tabs.length>2){const k=tabs.find(x=>x!==state.id&&x!==id);tabs=tabs.filter(x=>x!==k)}}go("view",id);
+/* Presenter Mode: a hymn chosen from the list, search or Starred puts its first verse on the screen straight away
+   (unless that hymn is already on it) */
+if(fromList&&pmOn()&&ptok()&&!(live&&live.id===id)){const h=HYMNS.find(x=>x.id===id);if(h&&pres(h).length){pvm[id]=0;pshow(h,0,"v")}}}
 function tabsBar(){if(tabs.length<2)return"";return `<div class="tabs" role="tablist" aria-label="Open hymns">`+tabs.map(id=>{const t=HYMNS.find(x=>x.id===id);if(!t)return"";const on=id===state.id,lv=pmOn()&&live&&live.id===id,lab=(isPs(t)?"Psalm "+String(t.psalm).trim():t.number)+" · "+(isPs(t)?(t.first||t.title):t.title);return `<span class="chip${on?" on":""}${lv?" lv":""}"><button class="tb" role="tab" aria-selected="${on}" data-a="tab" data-id="${id}">${esc(lab)}</button><button class="tx" data-a="tabx" data-id="${id}" aria-label="Close ${esc(lab)}">×</button></span>`}).join("")+`</div>`}
 const ph=()=>{if(cn==="psalter")return "Search Psalms...";const n=HYMNS.filter(h=>(h.collection||"hymn")===cn).length;return "Search "+(n?n+" ":"")+(cn==="christmas"?(n===1?"Carol":"Carols"):(n===1?"Hymn":"Hymns"))+"..."};
 const isPs=h=>h.collection==="psalter"&&!!String(h.psalm||"").trim(),ttl=h=>isPs(h)?"Psalm "+String(h.psalm).trim():h.title;
