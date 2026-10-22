@@ -124,7 +124,13 @@ body.pm main{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}body.p
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]):not([data-x]){--psa:#e5728a;--psg:#efa3b3;--psacs:rgba(229,114,138,.14);--psonac:#2b1018;--hya:#5cc6d8;--hyg:#8bd8e6;--hyacs:rgba(92,198,216,.14);--hyonac:#10262b}}
 :root[data-theme="dark"]:not([data-x]){--psa:#e5728a;--psg:#efa3b3;--psacs:rgba(229,114,138,.14);--psonac:#2b1018;--hya:#5cc6d8;--hyg:#8bd8e6;--hyacs:rgba(92,198,216,.14);--hyonac:#10262b}
 :root[data-col="psalter"]:not([data-x]):not([data-y]),.card:has(.num.psn),.chip.ps{--accent:var(--psa);--gold:var(--psg);--acs:var(--psacs);--onac:var(--psonac)}
-:root[data-col="psalter"] .chip:not(.ps){--accent:var(--hya);--gold:var(--hyg);--acs:var(--hyacs);--onac:var(--hyonac)}
+:root[data-col="psalter"] .chip:not(.ps):not(.xm){--accent:var(--hya);--gold:var(--hyg);--acs:var(--hyacs);--onac:var(--hyonac)}
+/* The carols in pine green, kept among hymns and psalms too */
+:root{--xma:#1f6f5c;--xmg:#175245;--xmacs:rgba(31,111,92,.10);--xmonac:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]):not([data-x]){--xma:#63c7a8;--xmg:#97dcc6;--xmacs:rgba(99,199,168,.14);--xmonac:#0f2620}}
+:root[data-theme="dark"]:not([data-x]){--xma:#63c7a8;--xmg:#97dcc6;--xmacs:rgba(99,199,168,.14);--xmonac:#0f2620}
+:root[data-col="christmas"]:not([data-x]):not([data-y]),.card.c-christmas,.chip.xm{--accent:var(--xma);--gold:var(--xmg);--acs:var(--xmacs);--onac:var(--xmonac)}
+:root[data-col="christmas"] .chip:not(.xm):not(.ps),:root[data-col="psalter"] .chip.hy{--accent:var(--hya);--gold:var(--hyg);--acs:var(--hyacs);--onac:var(--hyonac)}
 </style>
 </head>
 <body>
@@ -147,7 +153,7 @@ const SC={list:0,starred:0};function openHymn(id){const fromList=state.v==="list
 /* Presenter Mode: a hymn chosen from the list, search or Starred puts its first verse on the screen straight away
    (unless that hymn is already on it) */
 if(fromList&&pmOn()&&ptok()&&!(live&&live.id===id)){const h=HYMNS.find(x=>x.id===id);if(h&&pres(h).length){pvm[id]=0;pshow(h,0,"v")}}}
-function tabsBar(){if(tabs.length<2)return"";return `<div class="tabs" role="tablist" aria-label="Open hymns">`+tabs.map(id=>{const t=HYMNS.find(x=>x.id===id);if(!t)return"";const on=id===state.id,lv=pmOn()&&live&&live.id===id,lab=(isPs(t)?"Psalm "+String(t.psalm).trim():t.number)+" · "+(t.title||t.first);return `<span class="chip${on?" on":""}${lv?" lv":""}${isPs(t)?" ps":""}"><button class="tb" role="tab" aria-selected="${on}" data-a="tab" data-id="${id}">${esc(lab)}</button><button class="tx" data-a="tabx" data-id="${id}" aria-label="Close ${esc(lab)}">×</button></span>`}).join("")+`</div>`}
+function tabsBar(){if(tabs.length<2)return"";return `<div class="tabs" role="tablist" aria-label="Open hymns">`+tabs.map(id=>{const t=HYMNS.find(x=>x.id===id);if(!t)return"";const on=id===state.id,lv=pmOn()&&live&&live.id===id,lab=(isPs(t)?"Psalm "+String(t.psalm).trim():t.number)+" · "+(t.title||t.first);return `<span class="chip${on?" on":""}${lv?" lv":""}${isPs(t)?" ps":t.collection==="christmas"?" xm":""}"><button class="tb" role="tab" aria-selected="${on}" data-a="tab" data-id="${id}">${esc(lab)}</button><button class="tx" data-a="tabx" data-id="${id}" aria-label="Close ${esc(lab)}">×</button></span>`}).join("")+`</div>`}
 const ph=()=>{if(cn==="psalter")return "Search Psalms...";const n=HYMNS.filter(h=>(h.collection||"hymn")===cn).length;return "Search "+(n?n+" ":"")+(cn==="christmas"?(n===1?"Carol":"Carols"):(n===1?"Hymn":"Hymns"))+"..."};
 const isPs=h=>h.collection==="psalter"&&!!String(h.psalm||"").trim(),ttl=h=>isPs(h)?"Psalm "+String(h.psalm).trim():h.title;
 const MINOR=new Set("a an the and but or nor for so yet as at by in of on per to via with from into onto upon unto".split(" "));
@@ -337,7 +343,7 @@ else if(a==="pmre"){location.href=pUrl(pmLast(),"next=hymns&pm=1")}})}
 if(pmOn())pconnect();
 function go(v,id=null,keep){stopA();if(!keep){alt=null}if(pmOn()&&live&&(v==="list"||v==="starred"))pclear();state.v=v;state.id=id;render();window.scrollTo(0,0)}
 function render(){document.documentElement.dataset.col=(state.v==="starred"||state.v==="settings")?"hymn":cn;$("header").hidden=state.v!=="list";document.documentElement.style.setProperty("--hh",(state.v==="list"?$("header").offsetHeight:0)+"px");document.body.classList.toggle("nohd",state.v!=="list");if(state.v==="list")syncCol();$("#app").innerHTML=state.v==="view"?view():state.v==="meter"?meterScreen():state.v==="alts"?altScreen():state.v==="starred"?starredScreen():state.v==="settings"?settingsScreen():state.v==="cats"?catsScreen():list();document.querySelectorAll("#ft button").forEach(b=>{const on=b.dataset.f===(state.v==="starred"?"starred":state.v==="settings"?"settings":"list");b.classList.toggle("on",on);b.setAttribute("aria-current",on?"page":"false")});bind()}
-const card=h=>`<div class="card" data-a="open" data-id="${h.id}"><div class="num${isPs(h)?" psn":""}">${isPs(h)?`<small>PSALM</small>${esc(String(h.psalm).trim())}`:esc(h.number)}</div><div style="min-width:0"><h3>${esc(isPs(h)?(h.title||titleCase(h.first||"")):h.title)}</h3>${isPs(h)?(h.tune?`<p class="tn">${esc(h.tune)}</p>`:""):(h.first?`<p>${esc(h.first)}</p>`:"")}</div></div>`;
+const card=h=>`<div class="card c-${h.collection||"hymn"}" data-a="open" data-id="${h.id}"><div class="num${isPs(h)?" psn":""}">${isPs(h)?`<small>PSALM</small>${esc(String(h.psalm).trim())}`:esc(h.number)}</div><div style="min-width:0"><h3>${esc(isPs(h)?(h.title||titleCase(h.first||"")):h.title)}</h3>${isPs(h)?(h.tune?`<p class="tn">${esc(h.tune)}</p>`:""):(h.first?`<p>${esc(h.first)}</p>`:"")}</div></div>`;
 /* Categories, for The Soterio Hymn Collection only. A hymn can be in several (its cats). */
 const CATS=["Praise & Worship","God the Father","Jesus Christ","The Holy Spirit","The Cross & Sufferings","Resurrection & Exaltation","Salvation & Redemption","Gospel & Invitation","Faith & Trust","Prayer & Communion","Christian Living","Consecration & Service","Comfort & Encouragement","The Church & Fellowship","The Word of God","Evangelism & Missions","Christ's Return","Heaven & Eternity","Thanksgiving","Children's Hymns"];
 let cat=null,ctab="cats",wq="";   // cat: what the list is narrowed to, {k:"cat"|"by", v}; ctab: the screen's tab
