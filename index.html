@@ -392,7 +392,7 @@ return `<div class="top2"><button class="btn bk" data-a="back" aria-label="Back 
 ${tuneBlock(h)}
 <div class="meta">${(h.alts||[]).length?`<span class="mt" data-a="alts" data-id="${h.id}" role="button"><b>${altLabel((h.alts||[]).length)}</b></span>`:""}</div>
 <hr>${pmOn()?pbody(h):body}
-${!pmOn()&&c.meter&&hasOthers(h,c)?`<hr class="fh"><div class="mfoot"><span class="mt" data-a="meter" data-id="${h.id}" role="button" title="See tunes with this meter"><b>${esc(c.meter)}</b></span></div>`:""}
+${!pmOn()?`<hr class="fh"><div class="mfoot">${c.meter?(hasOthers(h,c)?`<span class="mt" data-a="meter" data-id="${h.id}" role="button" title="See tunes with this meter"><b>${esc(c.meter)}</b></span>`:`<span><b>${esc(c.meter)}</b></span>`):""}</div>`:""}
 </article>`}
 // The search results under the hymn search stop above the phone's keyboard, so the last one can be scrolled to
 function fitSr(){const sr=$("#sr");if(!sr||sr.hidden)return;const v=window.visualViewport,bottom=v?v.offsetTop+v.height:innerHeight,top=sr.getBoundingClientRect().top;
